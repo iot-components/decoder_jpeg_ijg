@@ -164,7 +164,9 @@ static void jpeg_filerw_src_init(j_decompress_ptr cinfo)
  * Sample routine for JPEG decompression.  We assume that the source file name
  * is passed in.  We want to return 1 on success, 0 on error.
  */
-void mjpegdraw(uint8_t *mjpegbuffer, uint32_t size, uint8_t *outbuffer, lcd_write_cb lcd_cb)
+void mjpegdraw(uint8_t *mjpegbuffer, const uint32_t size, uint8_t *outbuffer,
+                const size_t outbuffer_width, const size_t outbuffer_height,
+                lcd_write_cb lcd_cb, const size_t lcd_width, const size_t lcd_height)
 {
     /* This struct contains the JPEG decompression parameters and pointers to
      * working space (which is allocated as needed by the JPEG library).
@@ -251,38 +253,39 @@ void mjpegdraw(uint8_t *mjpegbuffer, uint32_t size, uint8_t *outbuffer, lcd_writ
     /* Here we use the library's state variable cinfo.output_scanline as the
      * loop counter, so that we don't have to keep track ourselves.
      *///printf("w=%d, h=%d\n", cinfo.output_width, cinfo.output_height);
+    static uint32_t outbuffer_index = 0;
+    uint32_t index = 0;
 
-    while (cinfo.output_scanline < cinfo.output_height) {
+    size_t display_height = cinfo.output_height<lcd_height?cinfo.output_height:lcd_height;
+    size_t display_width = cinfo.output_width<lcd_width?cinfo.output_width:lcd_width;
+
+    while (cinfo.output_scanline < display_height) {
         /* jpeg_read_scanlines expects an array of pointers to scanlines.
          * Here the array is only one element long, but you could ask for
          * more than one scanline at a time if that's more convenient.
          */
 
+#ifdef CONFIG_COLOR_SPACE_RGB_565
         (void) jpeg_read_scanlines(&cinfo, buffer, 1);
         /* Assume put_scanline_someplace wants a pointer and sample count. */
-        uint8_t *inbuffer = buffer[0];
-        uint32_t index;
-        static uint32_t index_last = 0;
-        uint32_t y = cinfo.output_scanline;
-        //uint16_t *out = NULL;
-        uint16_t *out = (uint16_t *)outbuffer;// + (y * cinfo.output_width);
-
-        for (index = 0; index < cinfo.output_width; index++) {
-        uint16_t c = ((*inbuffer) >> 3) << 11 | ((*(inbuffer + 1)) >> 2) << 5 | (*(inbuffer + 2)) >> 3;
-
-#ifdef CONFIG_LCD_INTERFACE_I2S
-        out[index_last+index] = c;
-#else
-        out[index_last+index] = c >> 8 | c << 8;
-#endif
-        inbuffer += 3;
+        uint8_t *color_trans_head = buffer[0];
+        uint16_t *out = (uint16_t *)outbuffer;
+        for (index = 0; index < display_width; index++) {
+            uint16_t c = ((*color_trans_head) >> 3) << 11 | ((*(color_trans_head + 1)) >> 2) << 5 | (*(color_trans_head + 2)) >> 3;
+            out[outbuffer_index+index] = c; //big endian
+            color_trans_head += 3;
         }
+#elif CONFIG_COLOR_SPACE_RGB_888
+        //TODO:display size
+        JSAMPARRAY outbuffer_head = outbuffer + 3 * outbuffer_index;
+        (void) jpeg_read_scanlines(&cinfo, outbuffer_head, 1);
+        index = cinfo.output_width;
+#endif
+        outbuffer_index += index;
 
-        index_last += index;
-
-        if(!(y % CONFIG_LCD_BUF_HIGHT) || index_last >= (CONFIG_LCD_BUF_HIGHT*cinfo.output_width)){
-            lcd_cb(0, y-CONFIG_LCD_BUF_HIGHT, CONFIG_LCD_BUF_WIDTH, CONFIG_LCD_BUF_HIGHT, outbuffer);
-            index_last = 0;
+        if(!(cinfo.output_scanline % outbuffer_height) || outbuffer_index >= (outbuffer_height*outbuffer_width)){
+            lcd_cb(0, cinfo.output_scanline-outbuffer_height, outbuffer_width, outbuffer_height, outbuffer);
+            outbuffer_index = 0;
         }
 
     }
