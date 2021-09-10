@@ -12,7 +12,7 @@
 extern "C" {
 #endif
 
-typedef bool (*lcd_write_cb)(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t *data);
+typedef bool (*lcd_write_cb)(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t *data);
 void mjpegdraw(uint8_t *mjpegbuffer, const uint32_t size, uint8_t *outbuffer,
                 const size_t outbuffer_width, const size_t outbuffer_height,
                 lcd_write_cb lcd_cb, const size_t lcd_width, const size_t lcd_height);

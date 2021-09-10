@@ -23,9 +23,12 @@ list(APPEND srcs jpeg-9a/jaricom.c
                 jpeg-9a/wrppm.c
                 jpeg-9a/jidctint.c
                 jpeg-9a/jidctflt.c
-                jpeg-9a/jidctfst.c)
+                jpeg-9a/jidctfst.c
+                avifile.c
+                vidoplayer.c
+                )
 
 list(APPEND iclds "jpeg-9a" "include")
 
-idf_component_register(SRCS "jpegd2.c" "${srcs}"
+idf_component_register(SRCS "avifile.c" "vidoplayer.c" "jpegd2.c" "${srcs}"
                     INCLUDE_DIRS "${iclds}")
